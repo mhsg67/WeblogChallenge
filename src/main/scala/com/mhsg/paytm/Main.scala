@@ -50,8 +50,10 @@ object Main {
   })
 
   def main(args: Array[String]): Unit = {
-    if(args.length == 2) {
+    if (args.length == 2) {
       val sparkSession = SparkSession.builder().appName("mhsg_paytm_challenge").master("local[*]").getOrCreate()
+      sparkSession.sparkContext.setLogLevel("ERROR")
+
 
       val gap = args(0).toLong
       val dataFilePath = args(1)
@@ -65,17 +67,15 @@ object Main {
         .where(TIMESTAMP_COL =!= -1)
 
       val byIPAndUserAgentOrderByTimestamp = Window.partitionBy(IP_COL, USER_AGENT_COL).orderBy(TIMESTAMP_COL)
-      val laggedDF = cleanedUpTimestampsDF.withColumn(LAG, lag(TIMESTAMP_COL,1, 0) over byIPAndUserAgentOrderByTimestamp)
+      val laggedDF = cleanedUpTimestampsDF.withColumn(LAG, lag(TIMESTAMP_COL, 1, 0) over byIPAndUserAgentOrderByTimestamp)
       val isNewSessionDF = laggedDF.withColumn(IS_NEW_SESSION, (TIMESTAMP_COL - LAG_COL > gap).cast(INT))
       val sessionizedDF = isNewSessionDF.withColumn(SESSION_ID, sum(IS_NEW_SESSION) over byIPAndUserAgentOrderByTimestamp)
 
       val sessionsDurationsDF = sessionizedDF.groupBy(IP_COL, USER_AGENT_COL, SESSION_ID_COL)
-        .agg((max(TIMESTAMP_COL)-min(TIMESTAMP_COL)).as(DURATION)).where(DURATION_COL =!= 0)
-      sessionsDurationsDF.agg(avg(DURATION_COL)).show
-
-      sessionizedDF.groupBy(IP_COL, USER_AGENT_COL, SESSION_ID_COL).agg(countDistinct(URL)).show()
-
-      val mostEngagingRow = sessionsDurationsDF.reduce((a, b) => if(a.getLong(3)> b.getLong(3)) a else b)
+        .agg((max(TIMESTAMP_COL) - min(TIMESTAMP_COL)).as(DURATION)).where(DURATION_COL =!= 0)
+      sessionsDurationsDF.agg(avg(DURATION_COL)).show(false)
+      sessionizedDF.groupBy(IP_COL, USER_AGENT_COL, SESSION_ID_COL).agg(countDistinct(URL)).show(100, false)
+      val mostEngagingRow = sessionsDurationsDF.reduce((a, b) => if (a.getLong(3) > b.getLong(3)) a else b)
       println(mostEngagingRow)
 
       sparkSession.close()
@@ -85,5 +85,4 @@ object Main {
       throw new IllegalArgumentException()
     }
   }
-
 }
