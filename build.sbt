@@ -11,5 +11,10 @@ lazy val app = (project in file(".")).
   settings(commonSettings: _*).
   settings(
     libraryDependencies ++= Seq(sparkCore, sparkSQL),
-    mainClass in run := Option("com.mhsg.paytm.Main")
+    mainClass in run := Some("com.mhsg.paytm.Main"),
+    mainClass in assembly := Some("com.mhsg.paytm.Main"),
+    assemblyMergeStrategy in assembly := {
+      case PathList("META-INF", xs @ _*) => MergeStrategy.discard
+      case x => MergeStrategy.first
+    }
   )
