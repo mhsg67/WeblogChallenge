@@ -26,6 +26,9 @@ object Main {
   val USER_AGENT = "user_agent"
   val SESSION_ID = "sessionId"
   val IS_NEW_SESSION = "is_new_session"
+  val UNIQUE_URL_COUNT = "UniqueURLCount"
+  val COUNT_DISTINCT_URL = "count(DISTINCT url)"
+
 
   val IP_COL = col(IP)
   val LAG_COL = col(LAG)
@@ -40,6 +43,7 @@ object Main {
   val DATE_TIME_COL = col(DATE_TIME)
   val USER_AGENT_COL = col(USER_AGENT)
   val SESSION_ID_COL = col(SESSION_ID)
+
 
   val rawFileReadOption = Map(("header" -> "false"), ("mode" -> "DROPMALFORMED"), ("delimiter" -> " "),
     ("quote" -> "\""), ("nullValue" -> "null"), ("treatEmptyValuesAsNulls" -> "true"))
@@ -74,12 +78,15 @@ object Main {
       val sessionsDurationsDF = sessionizedDF.groupBy(IP_COL, USER_AGENT_COL, SESSION_ID_COL)
         .agg((max(TIMESTAMP_COL) - min(TIMESTAMP_COL)).as(DURATION)).where(DURATION_COL =!= 0)
       sessionsDurationsDF.agg(avg(DURATION_COL)).show(false)
-      sessionizedDF.groupBy(IP_COL, USER_AGENT_COL, SESSION_ID_COL).agg(countDistinct(URL)).show(100, false)
+
       val mostEngagingRow = sessionsDurationsDF.reduce((a, b) => if (a.getLong(3) > b.getLong(3)) a else b)
-      println(mostEngagingRow)
+      println(s"Most Engaging user!")
+      println(s"IP: ${mostEngagingRow.getString(0)}, UserAgent: ${mostEngagingRow.getString(1)}")
+
+      sessionizedDF.groupBy(IP_COL, USER_AGENT_COL, SESSION_ID_COL).agg(countDistinct(URL))
+        .withColumnRenamed(COUNT_DISTINCT_URL, UNIQUE_URL_COUNT).write.parquet("data/URLCountPerSession")
 
       sparkSession.close()
-
     }
     else {
       throw new IllegalArgumentException()
